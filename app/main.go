@@ -7,6 +7,15 @@ import (
 	"os"
 )
 
+type RequestParseError struct {
+	Code    int
+	Message string
+}
+
+func (e *RequestParseError) Error() string {
+    return e.Message
+}
+
 type Request struct {
 	MessageSize int32
 	RequestApiKey int16
@@ -15,8 +24,9 @@ type Request struct {
 	ClientId string // nullable string
 }
 
-func ParseBuffer(buffer []byte) Request {
+func ParseBuffer(buffer []byte) (Request, error) {
 	var r Request
+
 	r.MessageSize = int32(binary.BigEndian.Uint32(buffer[0:4]))
 	r.RequestApiKey = int16(binary.BigEndian.Uint16(buffer[4:6]))
 	r.RequestApiVersion = int16(binary.BigEndian.Uint16(buffer[6:8]))
@@ -30,7 +40,11 @@ func ParseBuffer(buffer []byte) Request {
 		r.ClientId = string(buffer[14 : 14+nullableStringLength])
 	}
 
-	return r
+	if r.RequestApiVersion < 0 || r.RequestApiVersion > 4 {
+        return r, &RequestParseError{Code: 35, Message: "UNSUPPORTED_VERSION"}
+    }
+
+    return r, nil
 }
 
 type Response struct {
@@ -65,27 +79,42 @@ func main() {
 			break
 		}
 
-		request := ParseBuffer(buffer[:numberOfBytesRead])
-		response := processRequest(&request)
+		request, err := ParseBuffer(buffer[:numberOfBytesRead])
+		if err != nil {
+			fmt.Println("Error parsing request: ", err.Error())
+		}
+
+		response := processRequest(&request, err)
 
 		_, err = connection.Write(response)
 		if err != nil {
 			fmt.Println("Error writing to connection: ", err.Error())
-			break
+			continue
 		}
 	}
 }
 
 
-func processRequest(request *Request) []byte {
-	messageSize := createByteSliceFromInt(0)
-	correlationId := createByteSliceFromInt(int(request.CorrelationId))
+func processRequest(request *Request, err error) []byte {
+	buffer := make([]byte, 10)
 
-	return append(messageSize, correlationId...)
-}
+	binary.BigEndian.PutUint32(buffer[0:4], uint32(0))
+	binary.BigEndian.PutUint32(buffer[4:8], uint32(request.CorrelationId))
 
-func createByteSliceFromInt(integer int) []byte {
-	arr := make([]byte, 4)
-	binary.BigEndian.PutUint32(arr, uint32(integer))
-	return arr
+    if err != nil {
+		var code int
+
+        if parseErr, ok := err.(*RequestParseError); ok {
+            code = parseErr.Code
+        } else {
+            code = -1 // unknown error
+        }
+
+		fmt.Printf("Error Code: %d\n", code)
+		binary.BigEndian.PutUint16(buffer[8:10], uint16(code))
+    } else {
+		binary.BigEndian.PutUint16(buffer[8:10], uint16(0))
+	}
+
+	return buffer
 }
