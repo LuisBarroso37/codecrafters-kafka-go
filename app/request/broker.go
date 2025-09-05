@@ -37,6 +37,7 @@ func NewKafkaBroker() KafkaBroker {
 	handlers[ApiVersions] = &ApiVersionsHandler{
 		supportedApis: []ApiVersion{
 			{ApiKey: 18, MinVersion: 0, MaxVersion: 4, TaggedFields: map[string]string{}},
+			{ApiKey: 75, MinVersion: 0, MaxVersion: 0, TaggedFields: map[string]string{}},
 		},
 	}
 
