@@ -9,7 +9,6 @@ type KafkaRequest interface {
 
 type KafkaResponse interface {
 	GetCorrelationId() int32
-	GetErrorCode() int16
 	Serialize(apiVersion int16) ([]byte, error)
 }
 

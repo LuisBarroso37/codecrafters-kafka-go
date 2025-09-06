@@ -36,7 +36,16 @@ func TestProcessRequest(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00, // ThrottleTime: 0 (4 bytes)
 		0x00, // TaggedFields for response: 0 (no tagged fields)
 	}
-	broker := NewKafkaBroker()
+
+	handlers := make(map[KafkaAPIKey]RequestHandler)
+	handlers[ApiVersions] = &ApiVersionsHandler{
+		supportedApis: []ApiVersion{
+			{ApiKey: 18, MinVersion: 0, MaxVersion: 4, TaggedFields: map[string]string{}},
+		},
+	}
+	broker := KafkaBroker{
+		handlers: handlers,
+	}
 
 	response, err := broker.ProcessRequest(buffer)
 	if err != nil {

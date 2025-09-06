@@ -4,7 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/codecrafters-io/kafka-starter-go/app/parsing"
+	"github.com/codecrafters-io/kafka-starter-go/app/parser"
+	"github.com/codecrafters-io/kafka-starter-go/app/serializer"
 )
 
 type ApiVersionsRequest struct {
@@ -59,6 +60,10 @@ type ApiVersion struct {
 	TaggedFields map[string]string
 }
 
+// The ApiVersions API (Key 18) has a unique role in the Kafka protocol - it's the first API call a client makes to discover what API versions the broker supports.
+// Client needs to know broker capabilities before choosing message formats but the client can't know what response header format to expect until after the ApiVersions call completes.
+// Using header v1 would require knowing if the broker supports flexible versions before the handshake.
+// As such, it is an exceptional case and here we always return response header v0 (without tagged fields)
 type ApiVersionsResponse struct {
 	CorrelationId int32
 	ErrorCode     int16
@@ -69,43 +74,54 @@ type ApiVersionsResponse struct {
 
 func (r *ApiVersionsResponse) GetCorrelationId() int32 { return r.CorrelationId }
 
-func (r *ApiVersionsResponse) GetErrorCode() int16 { return r.ErrorCode }
-
 func (r *ApiVersionsResponse) Serialize(apiVersion int16) ([]byte, error) {
+	var err error
 	buffer := make([]byte, 256)
 	index := 0
 
 	// Message size (placeholder)
 	index += 4
 
-	// Correlation ID
-	binary.BigEndian.PutUint32(buffer[index:index+4], uint32(r.CorrelationId))
-	index += 4
-
-	// Error code
-	binary.BigEndian.PutUint16(buffer[index:index+2], uint16(r.ErrorCode))
-	index += 2
-
-	// ApiKeys array length
-	if apiVersion >= 3 {
-		index += binary.PutUvarint(buffer[index:], uint64(len(r.ApiKeys)+1))
-	} else {
-		binary.BigEndian.PutUint32(buffer[index:index+4], uint32(len(r.ApiKeys)))
-		index += 4
+	index, err = serializer.SerializeInt32(buffer, index, r.CorrelationId)
+	if err != nil {
+		return nil, err
 	}
 
-	// ApiKeys
-	for _, apiKey := range r.ApiKeys {
-		binary.BigEndian.PutUint16(buffer[index:index+2], uint16(apiKey.ApiKey))
-		index += 2
-		binary.BigEndian.PutUint16(buffer[index:index+2], uint16(apiKey.MinVersion))
-		index += 2
-		binary.BigEndian.PutUint16(buffer[index:index+2], uint16(apiKey.MaxVersion))
-		index += 2
+	index, err = serializer.SerializeInt16(buffer, index, r.ErrorCode)
+	if err != nil {
+		return nil, err
+	}
 
-		// Tagged fields
+	if apiVersion >= 3 {
+		index, err = serializer.SerializeUnsignedVarInt(buffer, index, uint64(len(r.ApiKeys)+1))
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		index, err = serializer.SerializeInt32(buffer, index, int32(len(r.ApiKeys)))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	for _, apiKey := range r.ApiKeys {
+		index, err = serializer.SerializeInt16(buffer, index, apiKey.ApiKey)
+		if err != nil {
+			return nil, err
+		}
+
+		index, err = serializer.SerializeInt16(buffer, index, apiKey.MinVersion)
+		if err != nil {
+			return nil, err
+		}
+
+		index, err = serializer.SerializeInt16(buffer, index, apiKey.MaxVersion)
+		if err != nil {
+			return nil, err
+		}
+
 		if apiVersion >= 3 {
-			newIndex, err := parsing.SerializeTaggedFields(buffer, index, apiKey.TaggedFields)
+			newIndex, err := serializer.SerializeTaggedFields(buffer, index, apiKey.TaggedFields)
 			if err != nil {
 				return nil, err
 			}
@@ -114,15 +130,15 @@ func (r *ApiVersionsResponse) Serialize(apiVersion int16) ([]byte, error) {
 		}
 	}
 
-	// Throttle time
 	if apiVersion >= 1 {
-		binary.BigEndian.PutUint32(buffer[index:index+4], uint32(r.ThrottleTime))
-		index += 4
+		index, err = serializer.SerializeInt32(buffer, index, r.ThrottleTime)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	// Tagged fields
 	if apiVersion >= 3 {
-		newIndex, err := parsing.SerializeTaggedFields(buffer, index, r.TaggedFields)
+		newIndex, err := serializer.SerializeTaggedFields(buffer, index, r.TaggedFields)
 		if err != nil {
 			return nil, err
 		}
@@ -146,7 +162,7 @@ func (h *ApiVersionsHandler) ParseRequestBody(requestHeader RequestHeader, buffe
 	req.Header = requestHeader
 
 	if isFlexibleVersion(req.Header.RequestApiKey, req.Header.RequestApiVersion) {
-		req.ClientSoftwareName, index, err = parsing.ExtractCompactString(buffer, index)
+		req.ClientSoftwareName, index, err = parser.ExtractCompactString(buffer, index)
 		if err != nil {
 			return nil, &RequestParseError{
 				Code:    INVALID_REQUEST,
@@ -154,7 +170,7 @@ func (h *ApiVersionsHandler) ParseRequestBody(requestHeader RequestHeader, buffe
 			}
 		}
 
-		req.ClientSoftwareVersion, index, err = parsing.ExtractCompactString(buffer, index)
+		req.ClientSoftwareVersion, index, err = parser.ExtractCompactString(buffer, index)
 		if err != nil {
 			return nil, &RequestParseError{
 				Code:    INVALID_REQUEST,
@@ -162,7 +178,7 @@ func (h *ApiVersionsHandler) ParseRequestBody(requestHeader RequestHeader, buffe
 			}
 		}
 
-		req.TaggedFields, _, err = parsing.ExtractTagFields(buffer, index)
+		req.TaggedFields, _, err = parser.ExtractTagFields(buffer, index)
 		if err != nil {
 			return nil, &RequestParseError{
 				Code:    INVALID_REQUEST,

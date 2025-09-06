@@ -1,9 +1,18 @@
-package parsing
+package parser
 
 import (
 	"encoding/binary"
 	"fmt"
 )
+
+func ExtractInt8(buffer []byte, index int) (int8, int, error) {
+	if index+1 > len(buffer) {
+		return 0, index, fmt.Errorf("failed to extract int8 - buffer too small")
+	}
+
+	value := int8(buffer[index])
+	return value, index + 1, nil
+}
 
 func ExtractInt16(buffer []byte, index int) (int16, int, error) {
 	if index+2 > len(buffer) {

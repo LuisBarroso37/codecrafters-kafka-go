@@ -40,6 +40,7 @@ func NewKafkaBroker() KafkaBroker {
 			{ApiKey: 75, MinVersion: 0, MaxVersion: 0, TaggedFields: map[string]string{}},
 		},
 	}
+	handlers[DescribeTopicPartitions] = &DescribeTopicPartitionsHandler{}
 
 	return KafkaBroker{
 		handlers: handlers,

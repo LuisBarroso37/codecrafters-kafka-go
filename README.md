@@ -32,3 +32,17 @@ Note: This section is for stages 2 and beyond.
    `app/main.go`.
 1. Commit your changes and run `git push origin master` to submit your solution
    to CodeCrafters. Test output will be streamed to your terminal.
+
+## Requests
+
+API Versions
+
+```
+echo -n "00000023001200040183eb7d00096b61666b612d636c69000a6b61666b612d636c6904302e3100" | xxd -r -p | nc localhost 9092 | hexdump -C
+```
+
+Describe Topic Partitions
+
+```
+echo -n "00000020004b00000000000700096b61666b612d636c69000204666f6f0000000064ff00" | xxd -r -p | nc localhost 9092 | hexdump -C
+```

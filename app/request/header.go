@@ -1,6 +1,6 @@
 package request
 
-import "github.com/codecrafters-io/kafka-starter-go/app/parsing"
+import "github.com/codecrafters-io/kafka-starter-go/app/parser"
 
 type RequestHeader struct {
 	MessageSize       int32
@@ -15,7 +15,7 @@ func ParseRequestHeader(buffer []byte, index int) (RequestHeader, int, error) {
 	var requestHeader RequestHeader
 	var err error
 
-	requestHeader.MessageSize, index, err = parsing.ExtractInt32(buffer, index)
+	requestHeader.MessageSize, index, err = parser.ExtractInt32(buffer, index)
 	if err != nil {
 		return RequestHeader{}, index, &RequestParseError{
 			Code:    INVALID_REQUEST,
@@ -23,7 +23,7 @@ func ParseRequestHeader(buffer []byte, index int) (RequestHeader, int, error) {
 		}
 	}
 
-	requestHeader.RequestApiKey, index, err = parsing.ExtractInt16(buffer, index)
+	requestHeader.RequestApiKey, index, err = parser.ExtractInt16(buffer, index)
 	if err != nil {
 		return RequestHeader{}, index, &RequestParseError{
 			Code:    INVALID_REQUEST,
@@ -31,7 +31,7 @@ func ParseRequestHeader(buffer []byte, index int) (RequestHeader, int, error) {
 		}
 	}
 
-	requestHeader.RequestApiVersion, index, err = parsing.ExtractInt16(buffer, index)
+	requestHeader.RequestApiVersion, index, err = parser.ExtractInt16(buffer, index)
 	if err != nil {
 		return RequestHeader{}, index, &RequestParseError{
 			Code:    INVALID_REQUEST,
@@ -39,7 +39,7 @@ func ParseRequestHeader(buffer []byte, index int) (RequestHeader, int, error) {
 		}
 	}
 
-	requestHeader.CorrelationId, index, err = parsing.ExtractInt32(buffer, index)
+	requestHeader.CorrelationId, index, err = parser.ExtractInt32(buffer, index)
 	if err != nil {
 		return RequestHeader{}, index, &RequestParseError{
 			Code:    INVALID_REQUEST,
@@ -47,7 +47,7 @@ func ParseRequestHeader(buffer []byte, index int) (RequestHeader, int, error) {
 		}
 	}
 
-	requestHeader.ClientId, index, err = parsing.ExtractNullableString(buffer, index)
+	requestHeader.ClientId, index, err = parser.ExtractNullableString(buffer, index)
 	if err != nil {
 		return RequestHeader{}, index, &RequestParseError{
 			Code:    INVALID_REQUEST,
@@ -56,7 +56,7 @@ func ParseRequestHeader(buffer []byte, index int) (RequestHeader, int, error) {
 	}
 
 	if isFlexibleVersion(requestHeader.RequestApiKey, requestHeader.RequestApiVersion) {
-		requestHeader.TaggedFields, index, err = parsing.ExtractTagFields(buffer, index)
+		requestHeader.TaggedFields, index, err = parser.ExtractTagFields(buffer, index)
 		if err != nil {
 			return RequestHeader{}, index, &RequestParseError{
 				Code:    INVALID_REQUEST,
